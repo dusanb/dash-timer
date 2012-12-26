@@ -14,6 +14,8 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 // define some values used by the panel and buttons
 int lcd_key     = 0;
 int adc_key_in  = 0;
+const int startPin = 2;
+const int finishPin = 3;
 
 unsigned int timeElapsed = 0;
 int startStop   = 0; //digital pin 2
@@ -87,8 +89,8 @@ sei();//allow interrupts
 
 void buttonSetup()
 {
-   pinMode(2, INPUT);
-   pinMode(3, INPUT);
+   pinMode(startPin, INPUT);
+   pinMode(finishPin, INPUT);
   pinMode(A2, INPUT);
   
   attachInterrupt(startStop, startISR, FALLING);
@@ -163,7 +165,7 @@ void enableStopWatch(boolean on)
 void startISR()
 {
   
-    startStopState = digitalRead(2);
+    startStopState = digitalRead(startPin);
     if (startStopState == LOW)
     {
       startStopFunction();
@@ -174,7 +176,7 @@ void startISR()
 void finishISR()
 {
   cli();
-  finishState = digitalRead(3);
+  finishState = digitalRead(finishPin);
   //check finished value so timer can't get accidentally restarted at finish line
   if (finishState == HIGH)
   {
