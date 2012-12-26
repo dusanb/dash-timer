@@ -78,11 +78,11 @@ void initMessage()
 
 void updateDisplay()
 {
-lcd.setCursor(10,1);
-lcd.print("----");
-lcd.setCursor(10,1);
- lcd.print(sw.elapsed());
- lcd.setCursor(1,1);
+  lcd.setCursor(10,1);
+  lcd.print("------");
+  lcd.setCursor(10,1);
+  printTime(sw.elapsed());
+  lcd.setCursor(1,1);
  
  switch (sw.state())
  {
@@ -103,6 +103,20 @@ lcd.setCursor(10,1);
    }
  }
    
+}
+
+void printTime(unsigned long elapsed)
+{
+  unsigned int seconds = elapsed / 1000;
+  unsigned int hundreds = constrain((elapsed - (seconds*1000)) / 10, 0, 99);
+  Serial.print(elapsed);
+  Serial.print(" - ");
+  Serial.print(seconds);
+  Serial.print(" = ");
+  Serial.println(elapsed - seconds);
+  lcd.print(seconds);
+  lcd.print(".");
+  lcd.print(hundreds);
 }
 
 
