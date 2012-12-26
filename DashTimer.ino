@@ -20,6 +20,10 @@ int adc_key_in  = 0;
 const int startPin = 2;
 const int finishPin = 3;
 
+volatile long lastStartDebounceCheck= 0;
+volatile long lastFinishDebounceCheck = 0;
+const int debounceDelay = 50;
+
 int startStop   = 0; //digital pin 2
 int finish       = 1; //digital pin 3
 
@@ -109,11 +113,7 @@ void printTime(unsigned long elapsed)
 {
   unsigned int seconds = elapsed / 1000;
   unsigned int hundreds = constrain((elapsed - (seconds*1000)) / 10, 0, 99);
-  Serial.print(elapsed);
-  Serial.print(" - ");
-  Serial.print(seconds);
-  Serial.print(" = ");
-  Serial.println(elapsed - seconds);
+
   lcd.print(seconds);
   lcd.print(".");
   lcd.print(hundreds);
@@ -122,21 +122,32 @@ void printTime(unsigned long elapsed)
 
 void startISR()
 {
-    startStopState = digitalRead(startPin);
-    if (startStopState == LOW)
-    {
-      sw.start();
-    }
+    
+   if ((millis() - lastStartDebounceCheck) > debounceDelay)
+   {
+      startStopState = digitalRead(startPin);
+      if (startStopState == LOW)
+      {
+        sw.start();
+      }
+   }
+    lastStartDebounceCheck = millis();
 }
 
 void finishISR()
 {
-  finishState = digitalRead(finishPin);
-  //check finished value so timer can't get accidentally restarted at finish line
-  if (finishState == HIGH)
+  if ((millis() - lastFinishDebounceCheck) > debounceDelay)
   {
-    sw.stop();
+    finishState = digitalRead(finishPin);
+    //check finished value so timer can't get accidentally restarted at finish line
+    if (finishState == HIGH)
+    {
+      sw.stop();
+    }
   }
+  
+  lastFinishDebounceCheck = millis();
+  
 }
 
  
