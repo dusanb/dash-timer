@@ -1,4 +1,4 @@
-//Sample using LiquidCrystal library
+#include <StopWatch.h>
 #include <LiquidCrystal.h>
 
 /*******************************************************
@@ -11,21 +11,21 @@ Mark Bramwell, July 2010
 // select the pins used on the LCD panel
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
+//StopWatch
+StopWatch sw;
+
 // define some values used by the panel and buttons
 int lcd_key     = 0;
 int adc_key_in  = 0;
 const int startPin = 2;
 const int finishPin = 3;
 
-unsigned int timeElapsed = 0;
 int startStop   = 0; //digital pin 2
 int finish       = 1; //digital pin 3
 
 volatile int startStopState = LOW;
 volatile int finishState = LOW;
 
-volatile boolean timing = false;
-volatile boolean finished = false;
 
 #define btnRIGHT  0
 #define btnUP     1
@@ -49,49 +49,10 @@ int read_LCD_buttons()
  return btnNONE;  // when all others fail, return this...
 }
 
-void timerSetup()
-{
-cli();//stop interrupts
-
-//set timer0 interrupt at 1kHz (this is the actual timer clock)
-  TCCR0A = 0;// set entire TCCR0A register to 0
-  TCCR0B = 0;// same for TCCR0B
-  TCNT0  = 0;//initialize counter value to 0
-  // set compare match register for 2khz increments
-  //OCR0A = 124;// = (16*10^6) / (2000*64) - 1 (must be <256)
-  // set compare match reg for 1Khz increments
-  OCR0A = 249;// = (16*10^6) / (1000*64) - 1 (must be <256)
-  
-  // turn on CTC mode
-  TCCR0A |= (1 << WGM01);
-  // Set CS11 and CS10 bits for 64 prescaler
-  TCCR0B |= (1 << CS11) | (1 << CS10);   
-  // enable timer compare interrupt (LATER)
-  //TIMSK0 |= (1 << OCIE0A);
-
-
-//set timer1 interrupt at 5Hz (this is to update display and other housekeeping)
-  TCCR1A = 0;// set entire TCCR1A register to 0
-  TCCR1B = 0;// same for TCCR1B
-  TCNT1  = 0;//initialize counter value to 0;
-  // set timer count for 10hz increments
-  OCR1A = 49999;// = (16*10^6) / (5*64) - 1
-  // turn on CTC mode
-  TCCR1B |= (1 << WGM12);
-  // Set CS11 bit for 8 prescaler
-  TCCR1B |= (1 << CS11);   
-  // enable timer compare interrupt 
-  //TIMSK1 |= (1 << OCIE1A);
-
-sei();//allow interrupts
-  
-}
-
 void buttonSetup()
 {
    pinMode(startPin, INPUT);
    pinMode(finishPin, INPUT);
-  pinMode(A2, INPUT);
   
   attachInterrupt(startStop, startISR, FALLING);
   attachInterrupt(finish, finishISR, RISING);
@@ -104,7 +65,6 @@ void setup()
  
  initMessage();
  buttonSetup();
- timerSetup();
 
  //digitalWrite(1, HIGH);
 }
@@ -115,66 +75,43 @@ void initMessage()
  lcd.print("Welcome to Dash Timer"); // print a simple message
 }
 
-ISR(TIMER0_COMPA_vect){//timer1 interrupt 1KHz
-//this is the actual internal running millisecond stopwatch
-  if (timing)
-  {
-    timeElapsed++;
-  }
-}
- 
-ISR(TIMER1_COMPA_vect){//timer1 interrupt 5Hz
-//update the display 5 times every seconds with changing info
-  updateDisplay();
-}
 
 void updateDisplay()
 {
-    lcd.setCursor(10,1);
-  lcd.print("----");
-  lcd.setCursor(10,1);
- lcd.print(timeElapsed);
+lcd.setCursor(10,1);
+lcd.print("----");
+lcd.setCursor(10,1);
+ lcd.print(sw.elapsed());
  lcd.setCursor(1,1);
- if (timing)
- {
-   lcd.print("TIMING ");
- }
- else
- {
-   lcd.print("WAITING");
- }
  
- if (finished)
+ switch (sw.state())
  {
-   lcd.setCursor(1,1);
-   lcd.print("FINISH!");
+   case StopWatch::RUNNING:
+   {
+     lcd.print("TIMING ");
+     break;
+   }
+   case StopWatch::STOPPED:
+   {
+     lcd.print("STOPPED");
+     break;
+   }
+   case StopWatch::RESET:
+   {
+     lcd.print("RESET  ");
+     break;
+   }
  }
+   
 }
 
-void enableStopWatch(boolean on)
-{
-  cli();
-  if (on)
-  {
-    // enable timer compare interrupt
-    TCNT0  = 0; //reset the counter
-    TIMSK0 |= (1 << OCIE0A);
-  }
-  else
-  {
-    // disable timer compare interrupt
-    TIMSK0 = 0;
-  }
-  sei();
-}
 
 void startISR()
 {
     startStopState = digitalRead(startPin);
     if (startStopState == LOW)
     {
-      timing = true;
-      enableStopWatch(true);
+      sw.start();
     }
 }
 
@@ -184,36 +121,25 @@ void finishISR()
   //check finished value so timer can't get accidentally restarted at finish line
   if (finishState == HIGH)
   {
-    if (timing)
-    {
-      timing = false;
-      enableStopWatch(false);
-      finished = true;
-    }
+    sw.stop();
   }
 }
 
-void startStopFunction()
-{
-  timing =~ timing;
-  enableStopWatch(timing);
-}
- 
  
 void loop()
 {
   Serial.print("Timer is  ");
-  if (timing)
+  if (sw.isRunning())
   {
     Serial.println(" ON");
-    updateDisplay();
   }
   else
   {
     Serial.println(" OFF");
   }
   
-  
+  updateDisplay();
+  delay(250);
  //nothing to do here
  lcd_key = read_LCD_buttons();  // read the buttons
  
@@ -221,17 +147,20 @@ void loop()
  {
    case btnRIGHT:
      {
-     if (!timing)
-     {
-       timeElapsed = 0;
-       finished = false;
-     }
+       Serial.println("RESET");
+       sw.reset();
+       
      break;
      }
    case btnLEFT:
      {
-     startStopFunction();
+     sw.stop();
      break;
+     }
+     case btnSELECT:
+     {
+       sw.start();
+       break;
      }
   }
   
