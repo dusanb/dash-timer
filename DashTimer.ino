@@ -81,7 +81,7 @@ cli();//stop interrupts
   // Set CS11 bit for 8 prescaler
   TCCR1B |= (1 << CS11);   
   // enable timer compare interrupt 
-  TIMSK1 |= (1 << OCIE1A);
+  //TIMSK1 |= (1 << OCIE1A);
 
 sei();//allow interrupts
   
@@ -99,6 +99,7 @@ void buttonSetup()
 
 void setup()
 {
+  Serial.begin(9600);
  lcd.begin(16, 2);              // start the library
  
  initMessage();
@@ -123,22 +124,27 @@ ISR(TIMER0_COMPA_vect){//timer1 interrupt 1KHz
 }
  
 ISR(TIMER1_COMPA_vect){//timer1 interrupt 5Hz
-//update the display every 5 seconds with changing info
-  lcd.setCursor(10,1);
+//update the display 5 times every seconds with changing info
+  updateDisplay();
+}
+
+void updateDisplay()
+{
+    lcd.setCursor(10,1);
   lcd.print("----");
   lcd.setCursor(10,1);
  lcd.print(timeElapsed);
  lcd.setCursor(1,1);
- if (startStopState == HIGH)
+ if (timing)
  {
-   lcd.print("ON      ");
+   lcd.print("TIMING ");
  }
  else
  {
-   lcd.print("OFF     ");
+   lcd.print("WAITING");
  }
  
- if (finishState == LOW)
+ if (finished)
  {
    lcd.setCursor(1,1);
    lcd.print("FINISH!");
@@ -164,29 +170,27 @@ void enableStopWatch(boolean on)
 
 void startISR()
 {
-  
     startStopState = digitalRead(startPin);
     if (startStopState == LOW)
     {
-      startStopFunction();
+      timing = true;
+      enableStopWatch(true);
     }
-  
 }
 
 void finishISR()
 {
-  cli();
   finishState = digitalRead(finishPin);
   //check finished value so timer can't get accidentally restarted at finish line
   if (finishState == HIGH)
   {
     if (timing)
     {
-      startStopFunction();
+      timing = false;
+      enableStopWatch(false);
       finished = true;
     }
   }
-  sei();
 }
 
 void startStopFunction()
@@ -198,6 +202,18 @@ void startStopFunction()
  
 void loop()
 {
+  Serial.print("Timer is  ");
+  if (timing)
+  {
+    Serial.println(" ON");
+    updateDisplay();
+  }
+  else
+  {
+    Serial.println(" OFF");
+  }
+  
+  
  //nothing to do here
  lcd_key = read_LCD_buttons();  // read the buttons
  
@@ -208,6 +224,7 @@ void loop()
      if (!timing)
      {
        timeElapsed = 0;
+       finished = false;
      }
      break;
      }
@@ -217,5 +234,6 @@ void loop()
      break;
      }
   }
+  
 }
 
